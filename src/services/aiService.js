@@ -1,46 +1,52 @@
-const Anthropic = require("@anthropic-ai/sdk");
+const { ChatAnthropic } = require("@langchain/anthropic");
+const { ChatPromptTemplate } = require("@langchain/core/prompts");
 
-const client = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY
+const model = new ChatAnthropic({
+    model:,
+    temperature:.
+    apikey:
 });
 
-
-async function generateSQL(userQuery, schema) {
-
-    const prompt = `
-You are a PostgreSQL SQL query generator.
+const prompt = ChatPromptTemplate.fromMessages([
+    [
+        "system",
+        `You are a PostgreSQL SQL query generator.
 
 You will receive a database schema and a user's natural language request.
 
-Your job is to convert the user's request into a valid PostgreSQL SELECT query.
-
-Database schema:
-${JSON.stringify(schema, null, 2)}
-
-User request:
-${userQuery}
+Convert the user's request into a valid PostgreSQL SELECT query.
 
 Rules:
 - Generate only SELECT queries.
-- Do not generate INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE or CREATE queries.
+- Do not generate INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE or CREATE.
 - Use only tables and columns present in the provided schema.
-- Return only the SQL query.
-`;
+- Return only the SQL query.`
+    ],
+    [
+        "human",
+        `Database schema:
 
-    const response = await client.messages.create({
-        model: "claude-opus-5",
-        max_tokens: 500,
-        messages: [
-            {
-                role: "user",
-                content: prompt
-            }
-        ]
+{schema}
+
+User request:
+
+{query}`
+    ]
+]);
+
+const chain = prompt.pipe(model);
+function cleanSQL(sql) {
+    return sql
+        .replace(/```sql/gi, "")
+        .replace(/```/g, "")
+        .trim();
+}
+async function generateSql(query,schema){
+    const response=await chain.invoke({
+        schema:JSON.stringify(schema,null,2),
+        query:query
     });
-
-    return response.content[0].text.trim();
+    return cleanSQL(response.content.toString().trim());
 }
 
-module.exports = {
-    generateSQL
-};
+module.exports={generateSql};
