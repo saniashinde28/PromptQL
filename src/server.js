@@ -11,22 +11,9 @@ app.use(express.json());
 app.get("/health", (req, res) => {
     res.send("Working!");
 });
-//get schema
-app.get("/api/schema", async (req, res) => {
-    try {
-        const schema = await getDatabaseSchema();
-        res.send(schema);
-    }
-    catch (err) {
-        console.log(err);
-        res.status(500).json({
-            error: "failed to fetch db schema"
-        });
-    }
-});
 
 //generate SQL
-app.post("/api/generateSql",async (req, res) => {
+app.post("/api/query",async (req, res) => {
     try {
         const { query } = req.body;
 
@@ -40,29 +27,26 @@ app.post("/api/generateSql",async (req, res) => {
 
         const sql = await generateSQL(query, schema);
 
-        res.json({ query, sql });
+        const result=await pool.query(sql);
+
+        res.json({success:true,
+            query,
+            sql,
+            data:result.rows,
+            rowCount:result.rowCount
+        });
     }
     catch (err) {
         console.error(err);
 
         res.status(500).json({
-            error: "Failed to generate SQL"
+            success:false,
+            error: "Failed to execute query"
         });
     }
-})
-
-//get queried data 
-app.get("/api/users", async (req, res) => {
-    try {
-        const result = await pool.query("Select * from users where city='Mumbai'");
-        console.log(result.rows);
-        res.send(result.rows);
-    }
-    catch (err) {
-        console.log(err);
-
-    }
 });
+
+
 
 app.listen(PORT, () => {
     console.log(`Server is running on port , ${PORT}`);
