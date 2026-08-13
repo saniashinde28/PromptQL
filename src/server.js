@@ -9,9 +9,9 @@ const { queryLimiter } = require("./middleware/rateLimiter");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const { QUERY_COUNTER,
-    QUERY_DURATION,updateDBConnections } = require("./services/monitoringService");
-const {client}=require("./services/monitoringService"); 
-const AppError=require("./utils/AppError");
+    QUERY_DURATION, updateDBConnections } = require("./services/monitoringService");
+const { client } = require("./services/monitoringService");
+const AppError = require("./utils/AppError");
 require('dotenv').config();
 
 const app = express();
@@ -30,9 +30,11 @@ app.post("/api/query", authenticateAPIkey, queryLimiter, async (req, res, next) 
         const { query } = req.body;
 
         if (!query) {
-            return res.status(400).json({
-                error: "Query is required!"
-            });
+            throw new AppError(
+                "Query is required",
+                400,
+                "MISSING_QUERY"
+            );
         }
         //step 1: intrpspect db
         const schema = await getDatabaseSchema();
@@ -86,8 +88,8 @@ app.post("/api/query", authenticateAPIkey, queryLimiter, async (req, res, next) 
     }
 });
 
-app.get("/metrics",async(req,res)=>{
-    res.set("Content-Type",client.register.contentType);
+app.get("/metrics", async (req, res) => {
+    res.set("Content-Type", client.register.contentType);
     res.end(await client.register.metrics());
 
 });
