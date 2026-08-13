@@ -4,6 +4,7 @@ const { getDatabaseSchema } = require("./services/schemaService");
 const { generateSQL } = require("./services/aiService");
 const {validateSqlQuery}=require("./services/validationService");
 const {errorHandler}=require("./middleware/errorHandler");
+const {authenticateAPIkey}=require("./middleware/auth");
 require('dotenv').config();
 
 const app = express();
@@ -15,7 +16,7 @@ app.get("/health", (req, res) => {
 });
 
 //generate SQL
-app.post("/api/query",async (req, res,next) => {
+app.post("/api/query",authenticateAPIkey,async (req, res,next) => {
     try {
         const { query } = req.body;
 
