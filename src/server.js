@@ -3,6 +3,7 @@ const pool = require('./db');
 const { getDatabaseSchema } = require("./services/schemaService");
 const { generateSQL } = require("./services/aiService");
 const {validateSqlQuery}=require("./services/validationService");
+const {errorHandler}=require("./middleware/errorHandler");
 require('dotenv').config();
 
 const app = express();
@@ -14,7 +15,7 @@ app.get("/health", (req, res) => {
 });
 
 //generate SQL
-app.post("/api/query",async (req, res) => {
+app.post("/api/query",async (req, res,next) => {
     try {
         const { query } = req.body;
 
@@ -51,15 +52,11 @@ app.post("/api/query",async (req, res) => {
     }
     catch (err) {
         console.error(err);
-
-        res.status(500).json({
-            success:false,
-            error: "Failed to execute query"
-        });
+        next(err);
     }
 });
 
-
+app.use(errorHandler);
 
 app.listen(PORT, () => {
     console.log(`Server is running on port , ${PORT}`);
