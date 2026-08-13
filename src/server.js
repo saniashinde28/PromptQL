@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('./db');
 const { getDatabaseSchema } = require("./services/schemaService");
 const { generateSQL } = require("./services/aiService");
+const {validateSqlQuery}=require("./services/validationService");
 require('dotenv').config();
 
 const app = express();
@@ -22,11 +23,23 @@ app.post("/api/query",async (req, res) => {
                 error: "Query is required!"
             });
         }
-
+        //step 1: intrpspect db
         const schema = await getDatabaseSchema();
+        const sql=query;
+        //step 2: send NL to claude
+        // const sql = await generateSQL(query, schema);
+        
+        //step 3: valid generated SQL
+        const isValid=validateSqlQuery(sql);
 
-        const sql = await generateSQL(query, schema);
-
+        if(!isValid){
+            return res.status(400).json({
+                success:false,
+                error:"Generated Sql query is invalid"
+            });
+        }
+        
+        //step 4 : execute the query
         const result=await pool.query(sql);
 
         res.json({success:true,

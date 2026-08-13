@@ -2,9 +2,9 @@ const { ChatAnthropic } = require("@langchain/anthropic");
 const { ChatPromptTemplate } = require("@langchain/core/prompts");
 
 const model = new ChatAnthropic({
-    model:,
-    temperature:.
-    apikey:
+    model:"claude-sonnet-4-6",
+    temperature:0,
+    apikey:process.env.ANTHROPIC_API_KEY
 });
 
 const prompt = ChatPromptTemplate.fromMessages([
@@ -41,7 +41,7 @@ function cleanSQL(sql) {
         .replace(/```/g, "")
         .trim();
 }
-async function generateSql(query,schema){
+async function generateSQL(query,schema){
     const response=await chain.invoke({
         schema:JSON.stringify(schema,null,2),
         query:query
@@ -49,4 +49,4 @@ async function generateSql(query,schema){
     return cleanSQL(response.content.toString().trim());
 }
 
-module.exports={generateSql};
+module.exports={generateSQL};
