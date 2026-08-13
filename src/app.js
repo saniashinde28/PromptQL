@@ -12,12 +12,16 @@ const { QUERY_COUNTER,
     QUERY_DURATION, updateDBConnections } = require("./services/monitoringService");
 const { client } = require("./services/monitoringService");
 const AppError = require("./utils/AppError");
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpec = require("./config/swagger");
 require('dotenv').config();
 
 const app = express();
 app.use(express.json());
 app.use(helmet());
 app.use(morgan("combined"));
+
+app.use("/docs",swaggerUi.serve,swaggerUi.setup(swaggerSpec));
 
 app.get("/health", (req, res) => {
     res.send("Working!");
