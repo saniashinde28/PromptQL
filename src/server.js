@@ -9,7 +9,7 @@ const { queryLimiter } = require("./middleware/rateLimiter");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const { QUERY_COUNTER,
-    QUERY_DURATION } = require("./services/monitoringService");
+    QUERY_DURATION,updateDBConnections } = require("./services/monitoringService");
 const {client}=require("./services/monitoringService"); 
 require('dotenv').config();
 
@@ -53,6 +53,7 @@ app.post("/api/query", authenticateAPIkey, queryLimiter, async (req, res, next) 
 
         //step 4 : execute the query
         const result = await pool.query(sql);
+        updateDBConnections(pool);
 
         const [seconds, nanoseconds] = process.hrtime(startTime);
 

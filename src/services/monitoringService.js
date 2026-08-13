@@ -27,10 +27,17 @@ const DB_CONNECTION_GAUGE = new client.Gauge({
     labelNames: ["source"]
 });
 
+function updateDBConnections(pool){
+    DB_CONNECTION_GAUGE
+    .labels("postgres")
+    .set(pool.totalCount);
+}
+
 module.exports = {
     client,
     QUERY_COUNTER,
     QUERY_DURATION,
     LLM_REQUESTS,
-    DB_CONNECTION_GAUGE
+    DB_CONNECTION_GAUGE,
+    updateDBConnections
 };
