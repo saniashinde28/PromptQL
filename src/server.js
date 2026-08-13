@@ -5,18 +5,21 @@ const { generateSQL } = require("./services/aiService");
 const {validateSqlQuery}=require("./services/validationService");
 const {errorHandler}=require("./middleware/errorHandler");
 const {authenticateAPIkey}=require("./middleware/auth");
+const {queryLimiter}=require("./middleware/rateLimiter");
+const helmet=require("helmet");
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT;
 app.use(express.json());
+app.use(helmet());
 
 app.get("/health", (req, res) => {
     res.send("Working!");
 });
 
 //generate SQL
-app.post("/api/query",authenticateAPIkey,async (req, res,next) => {
+app.post("/api/query",authenticateAPIkey,queryLimiter,async (req, res,next) => {
     try {
         const { query } = req.body;
 
