@@ -11,6 +11,7 @@ const morgan = require("morgan");
 const { QUERY_COUNTER,
     QUERY_DURATION,updateDBConnections } = require("./services/monitoringService");
 const {client}=require("./services/monitoringService"); 
+const AppError=require("./utils/AppError");
 require('dotenv').config();
 
 const app = express();
@@ -43,10 +44,11 @@ app.post("/api/query", authenticateAPIkey, queryLimiter, async (req, res, next) 
         const isValid = validateSqlQuery(sql);
 
         if (!isValid) {
-            return res.status(400).json({
-                success: false,
-                error: "Generated Sql query is invalid"
-            });
+            throw new AppError(
+                "Generated SQL query is invalid",
+                400,
+                "INVALID_SQL"
+            );
         }
 
         const startTime = process.hrtime();
