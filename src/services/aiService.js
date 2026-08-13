@@ -1,10 +1,11 @@
 const { ChatAnthropic } = require("@langchain/anthropic");
 const { ChatPromptTemplate } = require("@langchain/core/prompts");
+const { LLM_Requests } = require("./monitoringService");
 
 const model = new ChatAnthropic({
-    model:"claude-sonnet-4-6",
-    temperature:0,
-    apikey:process.env.ANTHROPIC_API_KEY
+    model: "claude-sonnet-4-6",
+    temperature: 0,
+    apikey: process.env.ANTHROPIC_API_KEY
 });
 
 const prompt = ChatPromptTemplate.fromMessages([
@@ -41,12 +42,23 @@ function cleanSQL(sql) {
         .replace(/```/g, "")
         .trim();
 }
-async function generateSQL(query,schema){
-    const response=await chain.invoke({
-        schema:JSON.stringify(schema,null,2),
-        query:query
-    });
-    return cleanSQL(response.content.toString().trim());
+async function generateSQL(query, schema) {
+    try {
+        const response = await chain.invoke({
+            schema: JSON.stringify(schema, null, 2),
+            query: query
+        });
+        LLM_REQUESTS
+            .labels("claude", "success")
+            .inc();
+        return cleanSQL(response.content.toString().trim());
+    } catch (err) {
+        LLM_REQUESTS
+            .labels("claude", "error")
+            .inc();
+
+        throw err;
+    }
 }
 
-module.exports={generateSQL};
+module.exports = { generateSQL };
