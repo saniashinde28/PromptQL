@@ -15,13 +15,28 @@ const { client } = require("./services/monitoringService");
 const AppError = require("./utils/AppError");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./config/swagger");
+const { getMongoDatabaseSchema } = require("./services/mongoSchemaService1");
 
+const {
+    generateMongoQuery
+} = require("./services/aiService");
+
+const {
+    validateMongoQuery
+} = require("./services/validationService");
+
+const {
+    executeMongoQuery,
+    collectionExists
+} = require("./services/mongoQuery");
 const app = express();
+const cors = require("cors");
+app.use(cors());
 app.use(express.json());
 app.use(helmet());
 app.use(morgan("combined"));
 
-app.use("/docs",swaggerUi.serve,swaggerUi.setup(swaggerSpec));
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 
 /**
@@ -81,7 +96,7 @@ app.get("/health", (req, res) => {
  */
 app.post("/api/query", authenticateAPIkey, queryLimiter, async (req, res, next) => {
     try {
-        const { query } = req.body;
+        const { query, source } = req.body;
 
         if (!query) {
             throw new AppError(
@@ -89,6 +104,47 @@ app.post("/api/query", authenticateAPIkey, queryLimiter, async (req, res, next) 
                 400,
                 "MISSING_QUERY"
             );
+        }
+
+        if (source === "mongodb") {
+
+            const schema = await getMongoDatabaseSchema();
+
+            const mongoQuery = await generateMongoQuery(
+                query,
+                schema
+            );
+
+            const isValid = validateMongoQuery(mongoQuery);
+
+            if (!isValid) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Generated MongoDB query is invalid"
+                });
+            }
+
+            const exists = await collectionExists(
+                mongoQuery.collection
+            );
+
+            if (!exists) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Collection does not exist"
+                });
+            }
+
+            const result = await executeMongoQuery(
+                mongoQuery
+            );
+
+            return res.json({
+                success: true,
+                query,
+                generatedQuery: mongoQuery,
+                data: result
+            });
         }
         //step 1: intrpspect db
         const schema = await getDatabaseSchema();
@@ -161,4 +217,4 @@ app.get("/metrics", async (req, res) => {
 
 app.use(errorHandler);
 
-module.exports=app;
+module.exports = app;

@@ -11,5 +11,22 @@ async function validateSqlQuery(query){
     }
 
 }
+function validateMongoQuery(query) {
 
-module.exports = {validateSqlQuery};
+    if (!query || typeof query !== "object") {
+        return false;
+    }
+
+    if (!query.operation || typeof query.operation !== "string") {
+        return false;
+    }
+
+    if (!query.collection || typeof query.collection !== "string") {
+        return false;
+    }
+
+    return true;
+}
+
+
+module.exports = {validateSqlQuery,validateMongoQuery};
