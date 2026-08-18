@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const pool = require('./db');
 const { getDatabaseSchema } = require("./services/schemaService");
@@ -14,7 +15,6 @@ const { client } = require("./services/monitoringService");
 const AppError = require("./utils/AppError");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./config/swagger");
-require('dotenv').config();
 
 const app = express();
 app.use(express.json());
