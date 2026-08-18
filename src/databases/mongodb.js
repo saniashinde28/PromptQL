@@ -15,7 +15,7 @@ const client = new MongoClient(mongoUri);
 
 let db;
 
-async function connectMongoDB() {
+async function connect() {
     try {
         await client.connect();
 
@@ -30,7 +30,27 @@ async function connectMongoDB() {
     }
 }
 
-function getMongoDB() {
+async function getSchema() {
+    const database = getDB();
+
+    const collections = await database.collections();
+
+    const schema = {};
+
+    for (const collection of collections) {
+        const documents = await database
+            .collection(collection.collectionName)
+            .find({})
+            .limit(5)
+            .toArray();
+
+        schema[collection.collectionName] = documents;
+    }
+
+    return schema;
+}
+
+function getDB() {
     if (!db) {
         throw new Error("MongoDB is not connected");
     }
