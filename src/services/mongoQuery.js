@@ -1,38 +1,38 @@
 const { connectMongoDB } = require("../databases/mongodb");
 
+
 async function executeMongoQuery(query) {
 
     const db = await connectMongoDB();
 
-    const collection = db.collection(query.collection);
+    const collection = db.collection(
+        query.collection
+    );
 
     switch (query.operation) {
 
         case "find":
+
             return await collection
                 .find(query.filter || {})
                 .toArray();
 
-        case "insertOne":
-            return await collection.insertOne(
-                query.document
-            );
 
-        case "updateMany":
-            return await collection.updateMany(
-                query.filter || {},
-                query.update
-            );
+        case "aggregate":
 
-        case "deleteMany":
-            return await collection.deleteMany(
-                query.filter || {}
-            );
+            return await collection
+                .aggregate(query.pipeline || [])
+                .toArray();
+
 
         default:
-            throw new Error("Unsupported MongoDB operation");
+
+            throw new Error(
+                "Only find and aggregate operations are allowed"
+            );
     }
 }
+
 
 async function collectionExists(collectionName) {
 
@@ -47,6 +47,9 @@ async function collectionExists(collectionName) {
     );
 }
 
+
 module.exports = {
-    executeMongoQuery,collectionExists
+    executeMongoQuery,
+    collectionExists
 };
+

@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const pool = require('./db');
 const { getDatabaseSchema } = require("./services/schemaService");
-const { generateSQL } = require("./services/aiService");
+const { generateQuery } = require("./services/aiService");
 const { validateSqlQuery } = require("./services/validationService");
 const { errorHandler } = require("./middleware/errorHandler");
 const { authenticateAPIkey } = require("./middleware/auth");
@@ -16,11 +16,6 @@ const AppError = require("./utils/AppError");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./config/swagger");
 const { getMongoDatabaseSchema } = require("./services/mongoSchemaService1");
-
-const {
-    generateMongoQuery
-} = require("./services/aiService");
-
 const {
     validateMongoQuery
 } = require("./services/validationService");
@@ -110,8 +105,9 @@ app.post("/api/query", authenticateAPIkey, queryLimiter, async (req, res, next) 
 
             const schema = await getMongoDatabaseSchema();
 
-            const mongoQuery = await generateMongoQuery(
+            const mongoQuery = await generateQuery(
                 query,
+                source,
                 schema
             );
 
@@ -148,9 +144,22 @@ app.post("/api/query", authenticateAPIkey, queryLimiter, async (req, res, next) 
         }
         //step 1: intrpspect db
         const schema = await getDatabaseSchema();
-        const sql = query;
+
         //step 2: send NL to claude
-        // const sql = await generateSQL(query, schema);
+        const generated = await generateQuery(query, source, schema);
+
+        if (
+            !generated ||
+            generated.type !== "sql" ||
+            !generated.query
+        ) {
+            throw new AppError(
+                "AI returned an invalid SQL query format",
+                400,
+                "INVALID_AI_RESPONSE"
+            );
+        }
+        const sql = generated.query;
 
         //step 3: valid generated SQL
         const isValid = validateSqlQuery(sql);

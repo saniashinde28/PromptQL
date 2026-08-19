@@ -1,146 +1,115 @@
-const { ChatAnthropic } = require("@langchain/anthropic");
-const { ChatPromptTemplate } = require("@langchain/core/prompts");
-const { LLM_REQUESTS } = require("./monitoringService");
+const { InferenceClient } = require("@huggingface/inference");
 
-const model = new ChatAnthropic({
-    model: "claude-sonnet-4-6",
-    temperature: 0,
-    apikey: process.env.ANTHROPIC_API_KEY
-});
+const client = new InferenceClient(
+    process.env.HF_TOKEN
+);
 
-const sqlPrompt = ChatPromptTemplate.fromMessages([
-    [
-        "system",
-        `You are a PostgreSQL SQL query generator.
+const MODEL = "Qwen/Qwen2.5-7B-Instruct";
 
-You will receive a database schema and a user's natural language request.
 
-Convert the user's request into a valid PostgreSQL SELECT query.
+function buildPrompt(userQuery, databaseType, schema) {
 
-Rules:
-- Generate only appropriate queries, do not give any explanations along with it
-- make sure the query syntax is correct
-- Use only tables and columns present in the provided schema.
-- Return only the SQL query without any comments.`
-    ],
-    [
-        "human",
-        `Database schema:
+    return `
+You are the query generation engine for PromptQL.
 
-{schema}
+PromptQL is a READ-ONLY natural language database query system.
+
+Database type:
+${databaseType}
+
+Database schema:
+${JSON.stringify(schema, null, 2)}
 
 User request:
-
-{query}`
-    ]
-]);
-
-const sqlChain = sqlPrompt.pipe(model);
-function cleanSQL(sql) {
-    return sql
-        .replace(/```sql/gi, "")
-        .replace(/```/g, "")
-        .trim();
-}
-async function generateSQL(query, schema) {
-    try {
-        const response = await chain.invoke({
-            schema: JSON.stringify(schema, null, 2),
-            query: query
-        });
-        LLM_REQUESTS
-            .labels("claude", "success")
-            .inc();
-        return cleanSQL(response.content.toString().trim());
-    } catch (err) {
-        LLM_REQUESTS
-            .labels("claude", "error")
-            .inc();
-
-        throw err;
-    }
-}
-
-const mongoPrompt = ChatPromptTemplate.fromMessages([
-    [
-        "system",
-        `You are a MongoDB query generator.
-
-You will receive a MongoDB database schema and a user's natural language request.
-
-Convert the user's request into a MongoDB find query.
+${userQuery}
 
 Rules:
-- Generate only syntactically valid operations
-- Use only collections and fields present in the provided schema.
-- Return ONLY valid JSON.
-- Do not return JavaScript.
-- Do not return markdown.
-- Do not explain anything.
 
-The JSON must follow this format:
+1. Generate ONLY read-only queries.
+2. Never generate INSERT, UPDATE, DELETE, DROP, ALTER,
+   CREATE, TRUNCATE, or any other write operation.
+3. Use only tables, collections, and fields present in the schema.
+4. Do not invent table names, collection names, or fields.
+5. Return ONLY valid JSON.
+6. Do not return markdown.
+7. Do not provide explanations.
 
-{{
+If the database is PostgreSQL, MySQL, or SQLite,
+return exactly:
+
+{
+    "type": "sql",
+    "query": "SELECT ..."
+}
+
+If the database is MongoDB and the request is a simple
+document lookup, return exactly:
+
+{
+    "type": "mongo",
     "operation": "find",
-    "collection": "users",
-    "filter": {{}},
-    "projection": {{}},
-    "sort": {{}},
-    "limit": 0
-    }}
-
-Use:
-- "filter" for filtering documents.
-- "projection" for selecting fields.
-- "sort" for sorting results.
-- "limit" for limiting results.
-`
-    ],
-    [
-        "human",
-        `Database schema:
-
-{schema}
-
-User request:
-
-{query}`
-    ]
-]);
-
-const mongoChain = mongoPrompt.pipe(model);
-function cleanMongoJSON(response) {
-    return response
-        .replace(/```json/gi, "")
-        .replace(/```/g, "")
-        .trim();
+    "collection": "collection_name",
+    "filter": {}
 }
-async function generateMongoQuery(query, schema) {
+
+If the database is MongoDB and the request requires
+aggregation, return exactly:
+
+{
+    "type": "mongo",
+    "operation": "aggregate",
+    "collection": "collection_name",
+    "pipeline": []
+}
+`;
+}
+
+
+async function generateQuery(userQuery, databaseType, schema) {
+
+    const prompt = buildPrompt(
+        userQuery,
+        databaseType,
+        schema
+    );
+
     try {
-        const response = await mongoChain.invoke({
-            schema: JSON.stringify(schema, null, 2),
-            query: query
+
+        const response = await client.chatCompletion({
+            model: MODEL,
+
+            messages: [
+                {
+                    role: "user",
+                    content: prompt
+                }
+            ],
+
+            max_tokens: 512,
+            temperature: 0.1
         });
 
-        LLM_REQUESTS
-            .labels("claude", "success")
-            .inc();
+        const content =
+            response.choices[0].message.content.trim();
 
-        const cleanedResponse = cleanMongoJSON(
-            response.content.toString()
+        console.log("AI response:", content);
+
+        return JSON.parse(content);
+
+    } catch (error) {
+
+        console.error(
+            "AI query generation failed:",
+            error.message
         );
 
-        return JSON.parse(cleanedResponse);
-
-    } catch (err) {
-
-        LLM_REQUESTS
-            .labels("claude", "error")
-            .inc();
-
-        throw err;
+        throw new Error(
+            "Failed to generate database query"
+        );
     }
 }
 
 
-module.exports = { generateSQL, generateMongoQuery };
+module.exports = {
+    generateQuery
+};
