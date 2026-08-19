@@ -39,12 +39,12 @@ class MongoDB extends BaseDB {
 
         await this.connect();
 
-        const collections = await db.listCollections().toArray();
+        const collections = await this.db.listCollections().toArray();
 
         const schema = {};
 
         for (const collection of collections) {
-            const documents = await db
+            const documents = await this.db
                 .collection(collection.name)
                 .find({})
                 .limit(5)
@@ -149,23 +149,37 @@ class MongoDB extends BaseDB {
             );
         }
 
-
         if (query.operation === "find") {
 
-            return await collection
-                .find(query.filter || {})
-                .toArray();
+            const data =
+                await collection
+                    .find(query.filter || {})
+                    .toArray();
+
+
+            return {
+                data,
+                rowCount: data.length
+            };
         }
 
 
         if (query.operation === "aggregate") {
 
-            return await collection
-                .aggregate(query.pipeline || [])
-                .toArray();
+            const data =
+                await collection
+                    .aggregate(
+                        query.pipeline || []
+                    )
+                    .toArray();
+
+
+            return {
+                data,
+                rowCount: data.length
+            };
         }
     }
-
 
     async collectionExists(collectionName) {
 

@@ -63,10 +63,10 @@ class MySQLDB extends BaseDB {
     }
 
 
-    async validateQuery(query) {
+    async validateQuery(queryPlan) {
 
         const normalized =
-            query.trim().toUpperCase();
+            queryPlan.query.trim().toUpperCase();
 
 
         if (!normalized.startsWith("SELECT")) {
@@ -94,10 +94,10 @@ class MySQLDB extends BaseDB {
     }
 
 
-    async executeQuery(query) {
+    async executeQuery(queryPlan) {
 
         const isValid =
-            await this.validateQuery(query);
+            await this.validateQuery(queryPlan.query);
 
         if (!isValid) {
 
@@ -108,7 +108,7 @@ class MySQLDB extends BaseDB {
 
 
         const [rows] =
-            await this.pool.query(query);
+            await this.pool.query(queryPlan.query);
 
 
         return {

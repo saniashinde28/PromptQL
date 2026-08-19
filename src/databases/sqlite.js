@@ -86,24 +86,53 @@ class SQLiteDB extends BaseDB {
     }
 
 
-    validateQuery(query) {
+    async validateQuery(queryPlan) {
+
+        if (!queryPlan ||
+            queryPlan.type !== "sql" ||
+            typeof queryPlan.query !== "string") {
+
+            return false;
+        }
+
+
+        const query =
+            queryPlan.query.trim();
+
 
         const normalized =
-            query.trim().toUpperCase();
+            query.toUpperCase();
 
-        return Promise.resolve(
-            normalized.startsWith("SELECT")
-        );
+
+        if (!normalized.startsWith("SELECT")) {
+            return false;
+        }
+
+
+        return true;
     }
 
 
-    executeQuery(query) {
+    async executeQuery(queryPlan) {
+
+        const isValid =
+            await this.validateQuery(
+                queryPlan
+            );
+
+        if (!isValid) {
+
+            throw new Error(
+                "Invalid or non-read-only SQLite query"
+            );
+        }
+
 
         return new Promise(
             (resolve, reject) => {
 
                 this.db.all(
-                    query,
+                    queryPlan.query,
                     [],
                     (error, rows) => {
 

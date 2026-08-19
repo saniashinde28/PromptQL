@@ -1,9 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const pool = require('./db');
-const { getDatabaseSchema } = require("./services/schemaService");
 const { generateQuery } = require("./services/aiService");
-const { validateSqlQuery } = require("./services/validationService");
 const { errorHandler } = require("./middleware/errorHandler");
 const { authenticateAPIkey } = require("./middleware/auth");
 const { queryLimiter } = require("./middleware/rateLimiter");
@@ -15,15 +12,7 @@ const { client } = require("./services/monitoringService");
 const AppError = require("./utils/AppError");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./config/swagger");
-const { getMongoDatabaseSchema } = require("./services/mongoSchemaService1");
-const {
-    validateMongoQuery
-} = require("./services/validationService");
-
-const {
-    executeMongoQuery,
-    collectionExists
-} = require("./services/mongoQuery");
+const {getDatabaseAdapter} = require("./databases/databaseFactory");
 const app = express();
 const cors = require("cors");
 app.use(cors());
@@ -89,123 +78,155 @@ app.get("/health", (req, res) => {
  *       500:
  *         description: Internal server error.
  */
-app.post("/api/query", authenticateAPIkey, queryLimiter, async (req, res, next) => {
-    try {
-        const { query, source } = req.body;
+app.post("/api/query",authenticateAPIkey,queryLimiter,async (req, res, next) => {
 
-        if (!query) {
-            throw new AppError(
-                "Query is required",
-                400,
-                "MISSING_QUERY"
-            );
-        }
+        let adapter;
+        let databaseType;
 
-        if (source === "mongodb") {
+        try {
 
-            const schema = await getMongoDatabaseSchema();
+            const {query,source} = req.body;
 
-            const mongoQuery = await generateQuery(
-                query,
-                source,
-                schema
-            );
+            //validate request
 
-            const isValid = validateMongoQuery(mongoQuery);
+            if (!query) {
+
+                throw new AppError(
+                    "Query is required",
+                    400,
+                    "MISSING_QUERY"
+                );
+            }
+
+
+            if (!source) {
+
+                throw new AppError(
+                    "Database source is required",
+                    400,
+                    "MISSING_SOURCE"
+                );
+            }
+
+            //DB adapter
+
+            databaseType = source;
+
+            adapter =
+                getDatabaseAdapter(
+                    databaseType
+                );
+
+
+            //connect to the DB
+
+            await adapter.connect();
+
+
+            //get the DB schema
+
+            const schema =
+                await adapter.getSchema();
+
+
+            //Generate the Query
+
+            const generatedQuery =
+                await generateQuery(
+                    query,
+                    databaseType,
+                    schema
+                );
+
+
+            //validate query
+
+            const isValid =
+                await adapter.validateQuery(
+                    generatedQuery
+                );
+
 
             if (!isValid) {
-                return res.status(400).json({
-                    success: false,
-                    error: "Generated MongoDB query is invalid"
-                });
+
+                throw new AppError(
+                    "Generated query is invalid",
+                    400,
+                    "INVALID_QUERY"
+                );
             }
 
-            const exists = await collectionExists(
-                mongoQuery.collection
-            );
 
-            if (!exists) {
-                return res.status(400).json({
-                    success: false,
-                    error: "Collection does not exist"
-                });
-            }
+            //execute query
 
-            const result = await executeMongoQuery(
-                mongoQuery
-            );
+            const startTime =
+                process.hrtime();
+
+
+            const result =
+                await adapter.executeQuery(
+                    generatedQuery
+                );
+
+
+            //duration
+
+            const [
+                seconds,
+                nanoseconds
+            ] = process.hrtime(startTime);
+
+
+            const duration =
+                seconds +
+                nanoseconds / 1e9;
+
+
+            //metrics 
+
+            QUERY_DURATION
+                .labels(databaseType)
+                .observe(duration);
+
+
+            QUERY_COUNTER
+                .labels(
+                    databaseType,
+                    "success"
+                )
+                .inc();
+
 
             return res.json({
+
                 success: true,
+
                 query,
-                generatedQuery: mongoQuery,
-                data: result
+
+                generatedQuery,
+
+                data: result.data,
+
+                rowCount: result.rowCount
             });
-        }
-        //step 1: intrpspect db
-        const schema = await getDatabaseSchema();
 
-        //step 2: send NL to claude
-        const generated = await generateQuery(query, source, schema);
-
-        if (
-            !generated ||
-            generated.type !== "sql" ||
-            !generated.query
-        ) {
-            throw new AppError(
-                "AI returned an invalid SQL query format",
-                400,
-                "INVALID_AI_RESPONSE"
-            );
-        }
-        const sql = generated.query;
-
-        //step 3: valid generated SQL
-        const isValid = validateSqlQuery(sql);
-
-        if (!isValid) {
-            throw new AppError(
-                "Generated SQL query is invalid",
-                400,
-                "INVALID_SQL"
-            );
         }
 
-        const startTime = process.hrtime();
+        catch (error) {
 
-        //step 4 : execute the query
-        const result = await pool.query(sql);
-        updateDBConnections(pool);
+            QUERY_COUNTER
+                .labels(
+                    databaseType || "unknown",
+                    "error"
+                )
+                .inc();
 
-        const [seconds, nanoseconds] = process.hrtime(startTime);
+            console.error(error);
 
-        const duration = seconds + nanoseconds / 1e9;
-
-        QUERY_DURATION
-            .labels("postgres")
-            .observe(duration);
-
-        QUERY_COUNTER
-            .labels("postgres", "success")
-            .inc();
-
-        res.json({
-            success: true,
-            query,
-            sql,
-            data: result.rows,
-            rowCount: result.rowCount
-        });
+            next(error);
+        }
     }
-    catch (err) {
-        QUERY_COUNTER
-            .labels("postgres", "error")
-            .inc();
-        console.error(err);
-        next(err);
-    }
-});
+);
 
 
 /**

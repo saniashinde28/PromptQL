@@ -7,7 +7,11 @@ class PostgresDB extends BaseDB {
         super();
 
         this.pool = new Pool({
-            connectionString: process.env.DATABASE_URL
+            host: process.env.POSTGRES_HOST,
+            port: process.env.POSTGRES_PORT,
+            user: process.env.POSTGRES_USER,
+            password: process.env.POSTGRES_PASSWORD,
+            database: process.env.POSTGRES_NAME
         });
     }
 
@@ -45,9 +49,9 @@ class PostgresDB extends BaseDB {
     }
 
 
-    async validateQuery(query) {
+    async validateQuery(queryPlan) {
 
-        const normalized = query
+        const normalized = queryPlan.query
             .trim()
             .toUpperCase();
 
@@ -58,7 +62,7 @@ class PostgresDB extends BaseDB {
         try {
 
             await this.pool.query(
-                `EXPLAIN ${query}`
+                `EXPLAIN ${queryPlan.query}`
             );
 
             return true;
@@ -75,9 +79,9 @@ class PostgresDB extends BaseDB {
     }
 
 
-    async executeQuery(query) {
+    async executeQuery(queryPlan) {
 
-        const isValid = await this.validateQuery(query);
+        const isValid = await this.validateQuery(queryPlan);
 
         if (!isValid) {
             throw new Error(
@@ -85,7 +89,7 @@ class PostgresDB extends BaseDB {
             );
         }
 
-        const result = await this.pool.query(query);
+        const result = await this.pool.query(queryPlan.query);
 
         return {
             data: result.rows,

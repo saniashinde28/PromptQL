@@ -34,6 +34,27 @@ Rules:
 6. Do not return markdown.
 7. Do not provide explanations.
 
+IMPORTANT SCHEMA RULES:
+
+1. You MUST use only tables, collections, fields, and columns
+   that exist in the provided schema.
+
+2. NEVER invent, assume, or hallucinate a field, column,
+   table, or collection.
+
+3. Before generating the query, check whether every field
+   required to answer the user's request exists in the schema.
+
+4. If any required field does not exist, DO NOT generate a query.
+
+5. Instead return:
+{
+  "type": "error",
+  "message": "The requested fields are not available in the provided schema."
+}
+
+6. The schema is the source of truth.
+
 If the database is PostgreSQL, MySQL, or SQLite,
 return exactly:
 
