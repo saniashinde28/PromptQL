@@ -156,6 +156,8 @@ app.post("/api/query",authenticateAPIkey,queryLimiter,async (req, res, next) => 
                 );
             }
 
+            const safeQuery=applyQueryLimit(generatedQuery);
+
 
             //execute query
 
@@ -165,7 +167,7 @@ app.post("/api/query",authenticateAPIkey,queryLimiter,async (req, res, next) => 
 
             const result =
                 await adapter.executeQuery(
-                    generatedQuery
+                    safeQuery
                 );
 
 
@@ -203,7 +205,7 @@ app.post("/api/query",authenticateAPIkey,queryLimiter,async (req, res, next) => 
 
                 query,
 
-                generatedQuery,
+                safeQuery,
 
                 data: result.data,
 
