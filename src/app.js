@@ -15,8 +15,12 @@ const swaggerSpec = require("./config/swagger");
 const { getDatabaseAdapter } = require("./databases/databaseFactory");
 const app = express();
 const cors = require("cors");
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+        origin: "*"
+    }));
+app.use(express.json({
+    limit: "1mb"
+}));
 app.use(helmet());
 app.use(morgan("combined"));
 
@@ -44,9 +48,12 @@ app.get("/health", (req, res) => {
  *   post:
  *     summary: Execute a natural language database query
  *     description: >
- *       Accepts a natural language query, uses Claude to generate SQL
- *       based on the database schema, validates the generated SQL,
- *       and executes it against the configured PostgreSQL database.
+ *       Accepts a natural language database request. PromptQL retrieves
+ *       the database schema, uses a Hugging Face Qwen model to generate
+ *       a read-only SQL or MongoDB query, validates the generated query
+ *       through the appropriate database adapter, and executes it.
+ *
+ *       Supported databases are PostgreSQL, MySQL, SQLite, and MongoDB.
  *
  *     security:
  *       - ApiKeyAuth: []
@@ -67,16 +74,32 @@ app.get("/health", (req, res) => {
  *               $ref: '#/components/schemas/QueryResponse'
  *
  *       400:
- *         description: Invalid request or generated SQL query.
+ *         description: Invalid request or generated query.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *
  *       401:
  *         description: Missing or invalid API key.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *
  *       429:
  *         description: Rate limit exceeded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *
  *       500:
  *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 app.post("/api/query", authenticateAPIkey, queryLimiter, async (req, res, next) => {
 
@@ -213,7 +236,7 @@ app.post("/api/query", authenticateAPIkey, queryLimiter, async (req, res, next) 
 
             query,
 
-            safeQuery,
+            generatedQuery,
 
             data: result.data,
 
