@@ -70,52 +70,68 @@ class MongoDB extends BaseDB {
 
     async validateQuery(query) {
 
-        if (!query ||
-            typeof query !== "object") {
-            return false;
-        }
+    if (!query || query.type !== "mongo") {
+        return false;
+    }
 
-        if (query.type !== "mongo") {
-            return false;
-        }
+    const allowedOperations = [
+        "find",
+        "aggregate"
+    ];
 
-        if (!query.collection ||
-            typeof query.collection !== "string") {
-            return false;
-        }
+    if (!allowedOperations.includes(query.operation)) {
+        return false;
+    }
+
+    if (!query.collection) {
+        return false;
+    }
+
+    // Validate MongoDB find
+    if (query.operation === "find") {
 
         if (
-            query.operation !== "find" &&
-            query.operation !== "aggregate"
+            query.filter !== undefined &&
+            typeof query.filter !== "object"
         ) {
             return false;
         }
 
+        return true;
+    }
 
-        if (query.operation === "find") {
+    // Validate MongoDB aggregation
+    if (query.operation === "aggregate") {
 
-            if (
-                query.filter !== undefined &&
-                (
-                    typeof query.filter !== "object" ||
-                    Array.isArray(query.filter)
-                )
-            ) {
-                return false;
-            }
+        if (!Array.isArray(query.pipeline)) {
+            return false;
         }
 
+        // Read-only aggregation stages
+        const forbiddenStages = [
+            "$out",
+            "$merge"
+        ];
 
-        if (query.operation === "aggregate") {
+        for (const stage of query.pipeline) {
 
-            if (!Array.isArray(query.pipeline)) {
+            if (!stage || typeof stage !== "object") {
                 return false;
             }
-        }
 
+            for (const operator of Object.keys(stage)) {
+
+                if (forbiddenStages.includes(operator)) {
+                    return false;
+                }
+            }
+        }
 
         return true;
     }
+
+    return false;
+}
 
 
     async executeQuery(query) {
