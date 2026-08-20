@@ -50,6 +50,13 @@ class PostgresDB extends BaseDB {
 
 
     async validateQuery(queryPlan) {
+        if (
+            !queryPlan ||
+            queryPlan.type !== "sql" ||
+            typeof queryPlan.query !== "string"
+        ) {
+            return false;
+        }
 
         const normalized = queryPlan.query
             .trim()
