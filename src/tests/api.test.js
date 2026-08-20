@@ -11,6 +11,38 @@ describe("Health API", () => {
         expect(response.statusCode).toBe(200);
     });
 
+    test("POST /api/query should reject missing query", async () => {
+
+        const response =
+            await request(app)
+                .post("/api/query")
+                .set("x-api-key", process.env.API_KEY)
+                .send({
+                    source: "postgres"
+                });
+
+
+        expect(response.statusCode)
+            .toBe(400);
+    });
+
+
+    test("POST /api/query should reject missing source", async () => {
+
+        const response =
+            await request(app)
+                .post("/api/query")
+                .set("x-api-key", process.env.API_KEY)
+                .send({
+                    query: "Show all users"
+                });
+
+
+        expect(response.statusCode)
+            .toBe(400);
+    });
+
+
 });
 
 describe("Query API", () => {
