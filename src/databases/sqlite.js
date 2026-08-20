@@ -9,7 +9,7 @@ class SQLiteDB extends BaseDB {
         super();
 
         this.db = new sqlite3.Database(
-            process.env.SQLITE_PATH
+            process.env.SQLITE_DB_PATH
         );
     }
 
