@@ -200,23 +200,5 @@ class MongoDB extends BaseDB {
     }
 }
 
-const MAX_QUERY_RESULTS =
-    Number(process.env.MAX_QUERY_RESULTS || 100);
-
-function applyQueryLimit(query) {
-
-    const normalized =
-        query.trim().toUpperCase();
-
-
-    if (
-        normalized.includes("LIMIT")
-    ) {
-        return query;
-    }
-
-
-    return `${query} LIMIT ${MAX_QUERY_RESULTS}`;
-}
 
 module.exports = MongoDB;

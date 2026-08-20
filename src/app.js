@@ -12,7 +12,7 @@ const { client } = require("./services/monitoringService");
 const AppError = require("./utils/AppError");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./config/swagger");
-const {getDatabaseAdapter} = require("./databases/databaseFactory");
+const { getDatabaseAdapter } = require("./databases/databaseFactory");
 const app = express();
 const cors = require("cors");
 app.use(cors());
@@ -78,156 +78,164 @@ app.get("/health", (req, res) => {
  *       500:
  *         description: Internal server error.
  */
-app.post("/api/query",authenticateAPIkey,queryLimiter,async (req, res, next) => {
+app.post("/api/query", authenticateAPIkey, queryLimiter, async (req, res, next) => {
 
-        let adapter;
-        let databaseType;
+    let adapter;
+    let databaseType;
 
-        try {
+    try {
 
-            const {query,source} = req.body;
+        const { query, source } = req.body;
 
-            //validate request
+        //validate request
 
-            if (!query) {
+        if (!query) {
 
-                throw new AppError(
-                    "Query is required",
-                    400,
-                    "MISSING_QUERY"
-                );
-            }
-
-
-            if (!source) {
-
-                throw new AppError(
-                    "Database source is required",
-                    400,
-                    "MISSING_SOURCE"
-                );
-            }
-
-            //DB adapter
-
-            databaseType = source;
-
-            adapter =
-                getDatabaseAdapter(
-                    databaseType
-                );
+            throw new AppError(
+                "Query is required",
+                400,
+                "MISSING_QUERY"
+            );
+        }
 
 
-            //connect to the DB
+        if (!source) {
 
-            await adapter.connect();
+            throw new AppError(
+                "Database source is required",
+                400,
+                "MISSING_SOURCE"
+            );
+        }
 
+        //DB adapter
 
-            //get the DB schema
+        databaseType = source;
 
-            const schema =
-                await adapter.getSchema();
-
-
-            //Generate the Query
-
-            const generatedQuery =
-                await generateQuery(
-                    query,
-                    databaseType,
-                    schema
-                );
+        adapter =
+            getDatabaseAdapter(
+                databaseType
+            );
 
 
-            //validate query
+        //connect to the DB
 
-            const isValid =
-                await adapter.validateQuery(
-                    generatedQuery
-                );
+        await adapter.connect();
 
 
-            if (!isValid) {
+        //get the DB schema
 
-                throw new AppError(
-                    "Generated query is invalid",
-                    400,
-                    "INVALID_QUERY"
-                );
-            }
-
-            const safeQuery=applyQueryLimit(generatedQuery);
+        const schema =
+            await adapter.getSchema();
 
 
-            //execute query
+        //Generate the Query
 
-            const startTime =
-                process.hrtime();
-
-
-            const result =
-                await adapter.executeQuery(
-                    safeQuery
-                );
-
-
-            //duration
-
-            const [
-                seconds,
-                nanoseconds
-            ] = process.hrtime(startTime);
-
-
-            const duration =
-                seconds +
-                nanoseconds / 1e9;
-
-
-            //metrics 
-
-            QUERY_DURATION
-                .labels(databaseType)
-                .observe(duration);
-
-
-            QUERY_COUNTER
-                .labels(
-                    databaseType,
-                    "success"
-                )
-                .inc();
-
-
-            return res.json({
-
-                success: true,
-
+        const generatedQuery =
+            await generateQuery(
                 query,
+                databaseType,
+                schema
+            );
 
-                safeQuery,
 
-                data: result.data,
+        //validate query
 
-                rowCount: result.rowCount
-            });
+        const isValid =
+            await adapter.validateQuery(
+                generatedQuery
+            );
 
+
+        if (!isValid) {
+
+            throw new AppError(
+                "Generated query is invalid",
+                400,
+                "INVALID_QUERY"
+            );
         }
 
-        catch (error) {
+        if (generatedQuery.type === "error") {
 
-            QUERY_COUNTER
-                .labels(
-                    databaseType || "unknown",
-                    "error"
-                )
-                .inc();
-
-            console.error(error);
-
-            next(error);
+            throw new AppError(
+                generatedQuery.message ||
+                "The requested fields are not available in the provided schema.",
+                400,
+                "QUERY_NOT_SUPPORTED"
+            );
         }
+
+
+        //execute query
+
+        const startTime =
+            process.hrtime();
+
+
+        const result =
+            await adapter.executeQuery(
+                generatedQuery
+            );
+
+
+        //duration
+
+        const [
+            seconds,
+            nanoseconds
+        ] = process.hrtime(startTime);
+
+
+        const duration =
+            seconds +
+            nanoseconds / 1e9;
+
+
+        //metrics 
+
+        QUERY_DURATION
+            .labels(databaseType)
+            .observe(duration);
+
+
+        QUERY_COUNTER
+            .labels(
+                databaseType,
+                "success"
+            )
+            .inc();
+
+
+        return res.json({
+
+            success: true,
+
+            query,
+
+            safeQuery,
+
+            data: result.data,
+
+            rowCount: result.rowCount
+        });
+
     }
+
+    catch (error) {
+
+        QUERY_COUNTER
+            .labels(
+                databaseType || "unknown",
+                "error"
+            )
+            .inc();
+
+        console.error(error);
+
+        next(error);
+    }
+}
 );
 
 

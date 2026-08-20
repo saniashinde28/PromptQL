@@ -98,6 +98,7 @@ async function generateQuery(userQuery, databaseType, schema) {
 
         const response = await client.chatCompletion({
             model: MODEL,
+            provider : "together",
 
             messages: [
                 {
@@ -118,6 +119,10 @@ async function generateQuery(userQuery, databaseType, schema) {
         return JSON.parse(content);
 
     } catch (error) {
+        console.error("AI query generation error:", error);
+        console.error("Error message:", error.message);
+        console.error("Error status:", error.status);
+        console.error("Error details:", error.response?.data);
 
         console.error(
             "AI query generation failed:",

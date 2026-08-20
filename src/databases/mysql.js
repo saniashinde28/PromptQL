@@ -77,7 +77,7 @@ class MySQLDB extends BaseDB {
         try {
 
             await this.pool.query(
-                `EXPLAIN ${query}`
+                `EXPLAIN ${queryPlan.query}`
             );
 
             return true;
@@ -97,7 +97,7 @@ class MySQLDB extends BaseDB {
     async executeQuery(queryPlan) {
 
         const isValid =
-            await this.validateQuery(queryPlan.query);
+            await this.validateQuery(queryPlan);
 
         if (!isValid) {
 
