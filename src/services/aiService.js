@@ -114,6 +114,25 @@ async function generateQuery(userQuery, databaseType, schema) {
         const content =
             response.choices[0].message.content.trim();
 
+        // in case the model ignores the instruction.
+
+        if (
+            content.startsWith("```")
+        ) {
+
+            content =
+                content
+                    .replace(
+                        /^```(?:json)?/i,
+                        ""
+                    )
+                    .replace(
+                        /```$/,
+                        ""
+                    )
+                    .trim();
+        }
+
         console.log("AI response:", content);
 
         return JSON.parse(content);
